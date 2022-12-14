@@ -1,55 +1,57 @@
 import { Socket } from 'socket.io';
 import socketIO from 'socket.io';
-import { UsuariosLista } from '../classes/usuarios-lista';
+
+import { Mapa } from '../classes/mapa';
+import { Marcador } from '../classes/marcador';
+import { Turnos } from '../classes/turnos';
 import { Usuario } from '../classes/usuario';
+import { Usuarios } from '../classes/usuarios';
 
+export const usuariosConectados = new Usuarios();
+export const mapa = new Mapa();
+export const turnos = new Turnos();
 
-export const usuariosConectados = new UsuariosLista();
-
-
-export const conectarCliente = ( cliente: Socket, io: socketIO.Server ) => {
+// Se usa en todas las secciones del curso
+export const afterClientConnection = ( cliente: Socket ) => {
 
     const usuario = new Usuario( cliente.id );
     usuariosConectados.agregar( usuario );
 
 }
 
-
-export const desconectar = ( cliente: Socket, io: socketIO.Server ) => {
+// Se usa en todas las secciones del curso
+export const listenForDesconectar = ( cliente: Socket ) => {
 
     cliente.on('disconnect', () => {
         console.log('Cliente desconectado');
 
         usuariosConectados.borrarUsuario( cliente.id );
 
-        io.emit('usuarios-activos', usuariosConectados.getLista()  );
+        cliente.broadcast.emit('usuarios-activos', usuariosConectados.getLista()  );
 
     });
 
 }
 
+// Escuchar mensajes generales - Se usa en todas las secciones del curso
+export const listenForMensajes = ( cliente: Socket ) => {
 
-// Escuchar mensajes
-export const mensaje = ( cliente: Socket, io: socketIO.Server ) => {
+    cliente.on('mensaje', (  payload: { origin: string, body: string }  ) => {
 
-    cliente.on('mensaje', (  payload: { de: string, cuerpo: string }  ) => {
-
-        console.log('Mensaje recibido', payload );
-
-        io.emit('mensaje-nuevo', payload );
+        cliente.broadcast.emit('mensaje-publico', payload );
 
     });
 
 }
 
-// Configurar usuario
-export const configurarUsuario = ( cliente: Socket, io: socketIO.Server ) => {
+// Escuchar mensajes de usuarios - Se usa en todas las secciones del curso
+export const listenForUsuarios = ( cliente: Socket, io: socketIO.Server ) => {
 
-    cliente.on('configurar-usuario', (  payload: { nombre: string }, callback: Function  ) => {
+    cliente.on('actualizar-usuario', (  payload: { nombre: string }, callback: Function  ) => {
 
         usuariosConectados.actualizarNombre( cliente.id, payload.nombre );
 
-        io.emit('usuarios-activos', usuariosConectados.getLista()  );
+        cliente.broadcast.emit('usuarios-activos', usuariosConectados.getLista()  );
 
         callback({
             ok: true,
@@ -57,15 +59,57 @@ export const configurarUsuario = ( cliente: Socket, io: socketIO.Server ) => {
         });
     });
 
+    cliente.on('consultar-usuarios', () => {
+
+        io.to( cliente.id ).emit('usuarios-activos', usuariosConectados.getLista()  );
+        
+    });
+
+}
+
+// Escuchar mensajes de mapas - Se usa en la sección S9 del curso
+export const listenForMapas = ( cliente: Socket ) => {
+
+    cliente.on('nuevo-marcador', (  marcador: Marcador  ) => {
+
+        mapa.agregarMarcador(marcador);
+        cliente.broadcast.emit('nuevo-marcador', marcador );
+
+    });
+
+    cliente.on('elimina-marcador', ( id: string ) => {
+
+        mapa.eliminarMarcador(id);
+        cliente.broadcast.emit('elimina-marcador', id );
+        
+    });
+
+    cliente.on('reposiciona-marcador', (  marcador: Marcador  ) => {
+
+        mapa.agregarMarcador(marcador);
+        console.log("Reposiciona: ", marcador);
+        cliente.broadcast.emit('reposiciona-marcador', marcador );
+
+    });
+
 }
 
 
-// Obtener Usuarios
-export const obtenerUsuarios = ( cliente: Socket, io: socketIO.Server ) => {
+// Escuchar mensajes de turnos - Se usa en la última sección S11 - Colas, del curso
+export const listenForTurnos = ( cliente: Socket ) => {
 
-    cliente.on('obtener-usuarios', () => {
+    cliente.on('asignar-turno', ( escritorio: number ) => {
 
-        io.to( cliente.id ).emit('usuarios-activos', usuariosConectados.getLista()  );
+        const turno = turnos.asignarTurno(escritorio);
+        cliente.emit('turno-asignado', turno );
+
+    });
+
+    cliente.on('lista-turnos', () => {
+
+        //console.log('lista de turnos ...', turnos.getTurnos());
+        cliente.emit('lista-turnos', turnos.getTurnos() );
+        cliente.broadcast.emit('lista-turnos', turnos.getTurnos() );
         
     });
 

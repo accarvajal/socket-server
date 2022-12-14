@@ -1,22 +1,19 @@
-
 import express from 'express';
 import { SERVER_PORT } from '../global/environment';
-import socketIO from 'socket.io';
-import http from 'http';
+import { Server } from 'socket.io';
+import { createServer } from 'http';
 
 import * as socket from '../sockets/socket';
 
+export default class ServerApp {
 
-
-export default class Server {
-
-    private static _intance: Server;
+    private static _intance: ServerApp;
 
     public app: express.Application;
     public port: number;
 
-    public io: socketIO.Server;
-    private httpServer: http.Server;
+    public io: Server;
+    private httpServer: any;
 
 
     private constructor() {
@@ -24,43 +21,48 @@ export default class Server {
         this.app = express();
         this.port = SERVER_PORT;
 
-        this.httpServer = new http.Server( this.app );
-        this.io = socketIO( this.httpServer );
+        this.httpServer = createServer( this.app );
+        this.io = new Server( this.httpServer, { 
+            cors: { 
+                //origin: "http://localhost:4200",
+                origin: true, 
+                credentials: true  
+            },
+        } );
 
-        this.escucharSockets();
+        this.listenSockets();
     }
 
     public static get instance() {
         return this._intance || ( this._intance = new this() );
     }
 
-
-    private escucharSockets() {
+    private listenSockets() {
 
         console.log('Escuchando conexiones - sockets');
 
         this.io.on('connection', cliente => {
 
-            // Conectar cliente
-            socket.conectarCliente( cliente, this.io );
+            // Después de Conectar cliente
+            socket.afterClientConnection( cliente );
 
-            // Configurar usuario
-            socket.configurarUsuario( cliente, this.io );
+            // Escuchar eventos de usuarios
+            socket.listenForUsuarios( cliente, this.io );
 
-            // Obtener usuarios activos
-            socket.obtenerUsuarios( cliente, this.io );
+            // Escuchar eventos de mapas
+            socket.listenForMapas( cliente );
 
-            // Mensajes
-            socket.mensaje( cliente, this.io );
+            socket.listenForTurnos( cliente );
 
-            // Desconectar
-            socket.desconectar( cliente, this.io );    
-            
+            // Escuchar eventos de Mensajes generales
+            socket.listenForMensajes( cliente );
+
+            // Escuchar eventos de Desconectar
+            socket.listenForDesconectar( cliente );          
 
         });
 
     }
-
 
     start( callback: Function ) {
 

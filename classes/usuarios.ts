@@ -1,7 +1,7 @@
 import { Usuario } from './usuario';
 
-
-export class UsuariosLista {
+// Se usa en todas las secciones del curso
+export class Usuarios {
 
     private lista: Usuario[] = [];
 
@@ -27,7 +27,6 @@ export class UsuariosLista {
 
         }
 
-
         console.log('===== Actualizando usuario ====');
         console.log( this.lista );
 
@@ -35,7 +34,7 @@ export class UsuariosLista {
 
     // Obtener lista de usuarios
     public getLista() {
-        return this.lista.filter( usuario => usuario.nombre !== 'sin-nombre' );
+        return this.lista.filter( usuario => usuario.nombre !== 'pending ...' );
     }
 
     // Obtener un usuario
